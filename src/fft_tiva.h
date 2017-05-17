@@ -1,3 +1,5 @@
+#ifndef	__FFT_TIVA_H__
+#define	__FFT_TIVA_H__
 #include <stdint.h>
 #include <math.h>
 #include <stdbool.h>
@@ -17,6 +19,7 @@ typedef struct
   float imag;
 }     COMPLEX;
 
+	
 
 //uint8_t ProcessdResult[N] ;  // need to edit if solution to plot float type is found
 																	//need to edit, do not use this . copy directly result from ProcessingArray to BuffA/B
@@ -26,3 +29,4 @@ void twiddle_array(int16_t fftlen, COMPLEX *twiddle);
 void fft(COMPLEX *Y, int16_t fftlen, COMPLEX *w);
 
 
+#endif

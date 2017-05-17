@@ -22,9 +22,6 @@ void vFFT_task(void );
 void vOsci_task(void );
 void vIdle_task(void );
 
-bool  booADC_A = true ;				// this varible used to indicate whether or not Buff A is full
-bool 	booUART_A = true ;			// the same with ADC
-bool  ProcessFlag = false ;
 uint32_t 	errorprocess  = 0 ;
 
 

@@ -8,6 +8,7 @@
 #include "fft_tiva.h"
 
 
+
 void twiddle_array(int16_t fftlen, COMPLEX *twiddle)
 {// tinh he so W cho fft W = e^(-j2pi/N)
   int16_t n;
@@ -23,7 +24,7 @@ void twiddle_array(int16_t fftlen, COMPLEX *twiddle)
 // FFT radix-2 Decimation-in-time
 void fft(COMPLEX *Y, int16_t fftlen, COMPLEX *w)
 {
-  COMPLEX temp, temp1 ; //temp2 ;
+  COMPLEX temp, temp1 , temp2 ;
   int i , j , k ;
   int upper_leg, lower_leg ;  //canh tren va canh xuong cua butterfly
   int leg_diff ;              			// ( nhin hinh tu hieu)
@@ -40,8 +41,8 @@ void fft(COMPLEX *Y, int16_t fftlen, COMPLEX *w)
   } while(i!=fftlen) ;
 //============================================================================//
   leg_diff = fftlen/2;
-  step  = fftlen ;
-/*
+  step  = 2 ;
+
 //============================================================================//
 //                  DIF FFT Algorithm implementation                          //
 	  for (i=0;i<num_stages;i++)      //for M-point FFT                 
@@ -94,7 +95,7 @@ void fft(COMPLEX *Y, int16_t fftlen, COMPLEX *w)
   return;
 }                       
 
-     */
+     /*
 //============================================================================//
 //                  DIT FFT Algorithm implementation                          //
 	
@@ -152,3 +153,4 @@ void fft(COMPLEX *Y, int16_t fftlen, COMPLEX *w)
 //============================================================================//
   return ;
 }
+*/

@@ -25,7 +25,8 @@ bool 					FlagOut[M] ;
 uint8_t 			Incount = 0; 
 uint8_t 			Outcount = M - 3 ;
 
-uint32_t 		ErrCount  =0  ;
+uint32_t 		ErrCount_Adc  =0  ;
+uint32_t 		ErrorCount_uart = 0 ;
 extern void PF4_IntHandler(void);
 
 void GPIOF_config(void)
@@ -89,22 +90,22 @@ void ADC_config(void)
 
 	IntEnable(INT_ADC0SS3) ;
 	
-	uDMAChannelAttributeDisable(UDMA_CHANNEL_ADC0,UDMA_ATTR_ALTSELECT | 
+	uDMAChannelAttributeDisable(UDMA_CHANNEL_ADC3,UDMA_ATTR_ALTSELECT | 
 																	UDMA_ATTR_REQMASK | UDMA_ATTR_HIGH_PRIORITY | UDMA_ATTR_USEBURST) ;
 	
 	// need to be confirmed. change DMA priority every 1/25k (s), so use bust request or not
  //	uDMAChannelAttributeEnable(UDMA_CHANNEL_ADC0, UDMA_ATTR_USEBURST ) ; // use bust request 
-	uDMAChannelControlSet(UDMA_CHANNEL_ADC0 | UDMA_PRI_SELECT, 
+	uDMAChannelControlSet(UDMA_CHANNEL_ADC3 | UDMA_PRI_SELECT, 
 							UDMA_SIZE_32 | UDMA_SRC_INC_NONE | UDMA_DST_INC_32 | UDMA_ARB_1 );
-	uDMAChannelControlSet(UDMA_CHANNEL_ADC0 | UDMA_ALT_SELECT, 
+	uDMAChannelControlSet(UDMA_CHANNEL_ADC3 | UDMA_ALT_SELECT, 
 							UDMA_SIZE_32 | UDMA_SRC_INC_NONE | UDMA_DST_INC_32 | UDMA_ARB_1 );
 							// hope this shit will work :((
-		uDMAChannelTransferSet(UDMA_CHANNEL_ADC0 | UDMA_PRI_SELECT, UDMA_MODE_PINGPONG,
-		(void *)(ADC0_BASE + ADC_O_SSFIFO0 ) , ui32ADCBuffA,  sizeof(ui32ADCBuffA)) ;
-		uDMAChannelTransferSet(UDMA_CHANNEL_ADC0 | UDMA_ALT_SELECT, UDMA_MODE_PINGPONG,
-		(void *)(ADC0_BASE + ADC_O_SSFIFO0 ), ui32ADCBuffB, sizeof(ui32ADCBuffB)) ;
+		uDMAChannelTransferSet(UDMA_CHANNEL_ADC3 | UDMA_PRI_SELECT, UDMA_MODE_PINGPONG,
+		(void *)(ADC0_BASE + ADC_O_SSFIFO3 ) , ui32ADCBuffA,  sizeof(ui32ADCBuffA)) ;
+		uDMAChannelTransferSet(UDMA_CHANNEL_ADC3 | UDMA_ALT_SELECT, UDMA_MODE_PINGPONG,
+		(void *)(ADC0_BASE + ADC_O_SSFIFO3 ), ui32ADCBuffB, sizeof(ui32ADCBuffB)) ;
 		
-	uDMAChannelEnable(UDMA_CHANNEL_ADC0) ;	
+	uDMAChannelEnable(UDMA_CHANNEL_ADC3) ;	
 	//start when trigger is detected
 	 ADCIntClear(ADC0_BASE, 3);
 	ADCSequenceEnable(ADC0_BASE, 3);																													
@@ -148,9 +149,9 @@ void UART_config(void)
 	//				NEED TO CONFIRM: USEBURST OR NOT
 	//
 	uDMAChannelControlSet(UDMA_CHANNEL_UART0TX | UDMA_PRI_SELECT, 
-							   UDMA_SIZE_8 | UDMA_SRC_INC_8 | UDMA_DST_INC_NONE | UDMA_ARB_1);
+							   UDMA_SIZE_8 | UDMA_SRC_INC_8 | UDMA_DST_INC_NONE | UDMA_ARB_4);
 	uDMAChannelControlSet(UDMA_CHANNEL_UART0TX | UDMA_ALT_SELECT , 
-									UDMA_SIZE_8 | UDMA_SRC_INC_8 | UDMA_DST_INC_NONE | UDMA_ARB_1 ) ;
+									UDMA_SIZE_8 | UDMA_SRC_INC_8 | UDMA_DST_INC_NONE | UDMA_ARB_4 ) ;
 	
 	uDMAChannelTransferSet(UDMA_CHANNEL_UART0TX | UDMA_PRI_SELECT, UDMA_MODE_PINGPONG,
 										ui8TxBuffA, (void *)(UART0_BASE + UART_O_DR),sizeof(ui8TxBuffA)) ;
@@ -177,7 +178,6 @@ void UART0_IntHandler(void)
 		// transfer buffer A is done ???
 		//
 		//		Put something here to notify CPU send data to buffer A
-			booUART_A = true ; // transfer from buff A UART is done
 
 			if(FlagOut[Outcount] == true)
 				{
@@ -192,7 +192,7 @@ void UART0_IntHandler(void)
 					FlagOut[Outcount] = false ;
 					FlagIn[Outcount] = true ;
 				}
-				else ErrCount++ ;
+				else ErrorCount_uart++ ;
 		
 					// configure to re-use this buffer when DMA playing with buffer B	
 		uDMAChannelTransferSet(UDMA_CHANNEL_UART0TX | UDMA_PRI_SELECT,
@@ -208,7 +208,6 @@ void UART0_IntHandler(void)
 		//
 		//	Put something here to notify CPU send data to buffer B
 		//
-		booUART_A = false ;
 		
 					if(FlagOut[Outcount] == true)
 				{
@@ -223,7 +222,7 @@ void UART0_IntHandler(void)
 					FlagOut[Outcount] = false ;
 					FlagIn[Outcount] = true ;
 				}
-				else ErrCount++ ;
+				else ErrorCount_uart++ ;
 		
 		uDMAChannelTransferSet(UDMA_CHANNEL_UART0TX | UDMA_ALT_SELECT, 
 		 UDMA_MODE_PINGPONG, ui8TxBuffB, (void *)(UART0_BASE + UART_O_DR ), sizeof(ui8TxBuffB)) ;
@@ -258,16 +257,10 @@ void ADC0_IntHandler(void)
 	ui32Status = ADCIntStatusEx(ADC0_BASE , true);
 	ADCIntClear(ADC0_BASE, ui32Status) ;				
 	
-	ui32Mode = uDMAChannelModeGet(UDMA_CHANNEL_ADC0 | UDMA_PRI_SELECT ) ;
+	ui32Mode = uDMAChannelModeGet(UDMA_CHANNEL_ADC3 | UDMA_PRI_SELECT ) ;
 	
 		if(ui32Mode == UDMA_MODE_STOP )
 		{	
-			booADC_A = true ;
-			//
-			// 		get data to buffer A(ADC)  is done  => \\\copy it into circullar buffer \\\
-			//																											=> Process data directly
-
-//			if( (currentMode == fftMode) ||( currentMode == phaseMode ) )
 
 		  if(FlagIn[Incount] == true)
 			{
@@ -281,21 +274,19 @@ void ADC0_IntHandler(void)
 					if(Incount==M)
 							Incount = 0 ;
 			}
-			else ErrCount++ ;
+			else ErrCount_Adc++ ;
 		
-			//reconfigure ADC Buff A to DMA
-			uDMAChannelTransferSet(UDMA_CHANNEL_ADC0 | UDMA_PRI_SELECT, UDMA_MODE_PINGPONG,
-												(void *)( ADC0_BASE + ADC_O_SSFIFO0), ui32ADCBuffA, sizeof(ui32ADCBuffA)) ;
+			uDMAChannelTransferSet(UDMA_CHANNEL_ADC3 | UDMA_PRI_SELECT, UDMA_MODE_PINGPONG,
+												(void *)( ADC0_BASE + ADC_O_SSFIFO3), ui32ADCBuffA, sizeof(ui32ADCBuffA)) ;
 			
 			
 		}
-	ui32Mode = uDMAChannelModeGet(UDMA_CHANNEL_ADC0 | UDMA_ALT_SELECT) ;
+	ui32Mode = uDMAChannelModeGet(UDMA_CHANNEL_ADC3 | UDMA_ALT_SELECT) ;
 		if(ui32Mode == UDMA_MODE_STOP )
 		{
 			//
 			// notify CPU that buffer B (ADC) is done => copy it into circullar buffer
 			//
-			booADC_A = false  ;
 //			if((currentMode == fftMode)||(currentMode == phaseMode)) 
 
 				if(FlagIn[Incount] == true)
@@ -310,10 +301,10 @@ void ADC0_IntHandler(void)
 					if(Incount==M)
 						Incount =0 ;
 				}
-				else ErrCount++ ;
+				else ErrCount_Adc++ ;
 			
-			uDMAChannelTransferSet(UDMA_CHANNEL_ADC0 | UDMA_ALT_SELECT, UDMA_MODE_PINGPONG,
-																	(void *)(ADC0_BASE + ADC_O_SSFIFO0), ui32ADCBuffB, sizeof(ui32ADCBuffB));
+			uDMAChannelTransferSet(UDMA_CHANNEL_ADC3 | UDMA_ALT_SELECT, UDMA_MODE_PINGPONG,
+																	(void *)(ADC0_BASE + ADC_O_SSFIFO3), ui32ADCBuffB, sizeof(ui32ADCBuffB));
 		}
 
 }
@@ -346,6 +337,7 @@ int main (void)
 	
   uint32_t 		n;
 	uint8_t 			count ;
+	float tempp  = 1.2345 ;
 //	float fft_debug[N] ;
 	SysCtlClockSet(SYSCTL_SYSDIV_2_5 | SYSCTL_USE_PLL | SYSCTL_OSC_MAIN | SYSCTL_XTAL_16MHZ);		//80MHz
 	SysCtlPeripheralClockGating(true) ;			// enable peripherals to operate when CPU is in sleep
@@ -358,8 +350,13 @@ int main (void)
 	UART_config();
 	Timer_config() ;
 	ADC_config() ;
-
-	
+/*
+	for(n=0;n<N;n++)
+	{
+		(CentralBuffer[5][n]).real = sinf(2*PI*5*n/N) ;
+		(CentralBuffer[5][n]).imag = 0 ;
+	}
+	*/
 	 twiddle_array(N, twiddle) ;
 	
 		for(count = 0; count<M;	count++)
@@ -378,6 +375,7 @@ int main (void)
 		}
 		while(currentMode == fftMode)
 		{
+
 			for(count=0; count<M;count++)
 			{
 				if(FlagIn[count] == false)
@@ -388,9 +386,14 @@ int main (void)
 					for(n = 0; n< N ; n++)
 					{
 					(CentralBuffer[count][n]).real = sqrtf((CentralBuffer[count][n]).real * (CentralBuffer[count][n]).real + (CentralBuffer[count][n].imag)*(CentralBuffer[count][n]).imag) ;
+
 					}
 					FlagOut[count] = true ;
-					}
+					
+					//FlagIn[count] = true ;
+					
+				}
+
 			}
 		}
 		while(currentMode == osciMode)
@@ -408,3 +411,4 @@ int main (void)
   }
 
 }
+
