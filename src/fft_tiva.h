@@ -7,7 +7,7 @@
 
 
 #define N   												128             // N-point FFT
-#define FS  												20000           // tan so lay mau
+#define FS  												10000           // tan so lay mau
 #define TEST_FREQ1 						5000
 #define TEST_FREQ2 						2500
 #define PI    											3.14159265358979
