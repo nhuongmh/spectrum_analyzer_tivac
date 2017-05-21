@@ -33,27 +33,27 @@ class Spectrum(FigureCanvas):
         self.window = window
         self.sample = 128
         self.fftSize = 128
-        self.sampleRate = 20000
+        self.sampleRate = 100000
         self.magnitude = np.zeros((self.fftSize))
         self.magnitude[50] = 10
         self.x_limit = self.sampleRate/2
-        self.y_limit = 200
-
+        self.y_limit = 250
+        self.magnitudes = np.zeros(int(self.fftSize))
         
         np.seterr(all ='ignore')
         self.fig = plt.figure(figsize=(12,4 ), dpi =100)
         #self.histAx = self.fig.add_subplot(111)
-        self.histAx = plt.axes (xlim = (0,self.fftSize),ylim = (0,self.y_limit))
+        self.histAx = plt.axes (xlim = (0,self.fftSize/2),ylim = (0,self.y_limit))
         self.histAx.set_title('Group 8 - Spectrum Analyzer')
         self.histAx.set_ylabel('Magnitude')
         self.histAx.set_xlabel('Frequency (Hz)')
         #self.mainPlot, =  self.histAx.plot([], [])
-        self.mainPlot = self.histAx.bar(np.arange(self.fftSize), np.zeros(self.fftSize), width= 1, linewidth= 1.0, facecolor = 'blue')
+        self.mainPlot = self.histAx.bar(np.arange(int(self.fftSize/2)), np.zeros(int(self.fftSize/2)), width= 1, linewidth= 1.0, facecolor = 'blue')
         #self.histAx.grid()
         #self.histAx.hold(False)
         self.updateGraph()
         super(Spectrum, self).__init__(self.fig)
-        self.ani = FuncAnimation(self.fig , self._update, frames= 200, interval = 1, blit = True)
+        self.ani = FuncAnimation(self.fig , self._update, frames= 1, interval = 1, blit = True)
 
     def updateFFTsize(self, fftSize):
         self.fftSize = fftSize          
@@ -79,39 +79,25 @@ class Spectrum(FigureCanvas):
 
     def updateGraph(self):
 
-        ticks=  (np.linspace(0, self.fftSize, 11))
+        ticks=  (np.linspace(0, self.fftSize/2, 11))
         labels = ['%d' % i for i in np.linspace(0, self.x_limit, 11)]
         self.histAx.set_xticks(ticks)
         self.histAx.set_xticklabels(labels)
 
     def _update(self, n):
         mags = self.window.getMagnitudes()
-        #print ('%s' %type(mags))
-        a = list(np.arange(0,self.fftSize,1))
         if type(mags) == list:
-        	for bin, mag in zip(self.mainPlot, mags):
-        		bin.set_height(mag)
-        	return self.mainPlot
+            #print (*mags)
+            a = sum(mags)/float(128)
+            print ("%f" %a)
+            mags = mags[0:int(self.fftSize/2)]
+
+            for bin, mag in zip(self.mainPlot, mags):
+                bin.set_height(mag)
+            return self.mainPlot
         else:
-        	return ()
-        	'''
-        	data = np.random.randn(1000)
-        	n, bins = np.histogram(data, 100)
-        	top = bottom + n
-        	verts[1::5, 1] = top
-        	verts[2::5, 1] = top
-        	return [patch, ]
-        	
-        	print (*mags)
-        	self.mainPlot.set_data(a,mags)
-        	return self.mainPlot,
-        else:
-        	x = (np.linspace(0, 128, 128))
-        	y = (80*np.sin(2 * np.pi * (x - 0.01 * n)))
-        	#print ('%s, %s'  %(type(x), type(y)))
-        	self.mainPlot.set_data(x,y)
-        	return self.mainPlot,
-        	'''
+            return ()
+
 class MainWindow(QMainWindow):
     def __init__(self, devices):
         super(MainWindow, self).__init__()
@@ -327,24 +313,37 @@ class MainWindow(QMainWindow):
             self.spectr.updateGraph()
     def set_xlimitFunc(self):
     	self.set_xlimitNum = self.set_xlimitBox.text()
-    	#self.spectr.update_xlimit(int(self.set_xlimitNum))
+    	self.spectr.update_xlimit(int(self.set_xlimitNum))
     def set_ylimitFunc(self):
     	self.set_ylimitNum = self.set_ylimitBox.text()
-    	#self.spectr.update_ylimit(int(self.set_ylimitNum))
+    	self.spectr.update_ylimit(int(self.set_ylimitNum))
 
 class SerialPortDevice:
     def __init__(self, path, name):
         self.path = path
         self.name = name
         self.baudrate = BAUDRATE
+        self.previous = np.zeros(128)
     def get_name(self):
         return self.name
         
     def get_magnitude(self):
+        while 1:
+            mag = int(ord(self.port.read()))
+            if mag == 255:
+                print ("%s" %'ok')
+                mags_array =  [float(ord(self.port.read())) for i in range(128)]
+                if (sum(mags_array)/128)<55 :
+                    self.previous = mags_array
+                    return mags_array
+                else:
+                    print ("%s" % 'mag error')
+                    return [i-1 for i in self.previous]
+            else:
+                return self.previous
+                print ("%s" % 'request error')
 
-    	mags_array =  [float(ord(self.port.read())) for i in range(128)]
-    	return mags_array
-
+                    
     def open(self):
         self.port = serial.Serial(self.path, baudrate = self.baudrate, bytesize = serial.EIGHTBITS,
          	parity= serial.PARITY_NONE, stopbits = serial.STOPBITS_ONE,timeout= 5 )
@@ -356,14 +355,13 @@ class SerialPortDevice:
         value = self.port.readline()
         if value == None or value =='':
             raise IOError('Error! _ Timeout.')
+        print ("%s" %value)
         return value
-
 
 
 def enumerate_devices():
     
     return [SerialPortDevice(port[0], port[1]) for port in serial.tools.list_ports.comports() if port[2] != 'n/a']
-
 
 
 
